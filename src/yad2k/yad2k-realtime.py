@@ -1,4 +1,5 @@
 #! /usr/bin/env python
+import argparse
 import colorsys
 import imghdr
 import os
@@ -17,10 +18,24 @@ model_path = 'model_data/tiny-yolo-voc.h5'
 anchors_path = 'model_data/tiny-yolo-voc_anchors.txt'
 classes_path = 'model_data/pascal_classes.txt'
 
-def detect_image(frame, sess, boxes, scores, classes, is_fixed_size):
+parser = argparse.ArgumentParser(
+    description='Run a YOLO_v2 style detection model on test images..')
+parser.add_argument(
+    '-s',
+    '--score_threshold',
+    type=float,
+    help='threshold for bounding box scores, default .3',
+    default=.3)
+parser.add_argument(
+    '-iou',
+    '--iou_threshold',
+    type=float,
+    help='threshold for non max suppression IOU, default .5',
+    default=.5)
+
+def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
     cv2_im = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     image = Image.fromarray(cv2_im)
-
 
     if is_fixed_size:  # TODO: When resizing we can use minibatch input.
         resized_image = image.resize(
@@ -45,7 +60,7 @@ def detect_image(frame, sess, boxes, scores, classes, is_fixed_size):
             input_image_shape: [image.size[1], image.size[0]],
             K.learning_phase(): 0
         })
-    print('Found {} boxes for {}'.format(len(out_boxes), image_file))
+    # print('Found {} boxes for {}'.format(len(out_boxes), image_file))
 
     font = ImageFont.truetype(
         font='font/FiraMono-Medium.otf',
@@ -59,7 +74,7 @@ def detect_image(frame, sess, boxes, scores, classes, is_fixed_size):
 
         label = '{} {:.2f}'.format(predicted_class, score)
         print(predicted_class, score)
-        
+
         draw = ImageDraw.Draw(image)
         label_size = draw.textsize(label, font)
 
@@ -90,10 +105,10 @@ def detect_image(frame, sess, boxes, scores, classes, is_fixed_size):
 
 
 
-
-def _main():
+def _main(args):
     sess = K.get_session()
 
+    global class_names
     with open(classes_path) as f:
         class_names = f.readlines()
     class_names = [c.strip() for c in class_names]
@@ -103,6 +118,7 @@ def _main():
         anchors = [float(x) for x in anchors.split(',')]
         anchors = np.array(anchors).reshape(-1, 2)
 
+    global yolo_model
     yolo_model = load_model(model_path)
 
     # Verify model, anchors, and classes are compatible
@@ -117,12 +133,15 @@ def _main():
     print('{} model, anchors, and classes loaded.'.format(model_path))
 
     # Check if model is fully convolutional, assuming channel last order.
+    global model_image_size
     model_image_size = yolo_model.layers[0].input_shape[1:3]
+    global is_fixed_size
     is_fixed_size = model_image_size != (None, None)
 
     # Generate colors for drawing bounding boxes.
     hsv_tuples = [(x / len(class_names), 1., 1.)
                   for x in range(len(class_names))]
+    global colors
     colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
     colors = list(
         map(lambda x: (int(x[0] * 255), int(x[1] * 255), int(x[2] * 255)),
@@ -134,6 +153,7 @@ def _main():
     # Generate output tensor targets for filtered bounding boxes.
     # TODO: Wrap these backend operations with Keras layers.
     yolo_outputs = yolo_head(yolo_model.output, anchors, len(class_names))
+    global input_image_shape
     input_image_shape = K.placeholder(shape=(2, ))
     boxes, scores, classes = yolo_eval(
         yolo_outputs,
@@ -154,7 +174,7 @@ def _main():
         if frame is not None:
             detect_img = detect_image(frame, sess, boxes, scores, classes, is_fixed_size)
             cv_image = np.array(detect_img)
-
+            cv2.imshow("preview", cv_image)
         rval, frame = cam.read()
 
         i = cv2.waitKey(1)
@@ -167,5 +187,5 @@ def _main():
 
 
 if __name__=='__main__':
-    _main()
+    _main(parser.parse_args())
 

@@ -37,7 +37,9 @@ RUN mkdir /opencv-3.4.0/build \
 && cd /opencv-3.4.0/build \
 && cmake -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr/local .. \
 && make -j4 \
-&& make install
+&& make install \
+&& rm -rf /opencv-3.4.0 \
+&& rm 3.4.0.zip
 
 # install tensorflow
 RUN pip3 install tensorflow

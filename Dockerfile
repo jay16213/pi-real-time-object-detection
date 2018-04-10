@@ -30,11 +30,47 @@ LABEL maintainer="jay101630@gmail.com"
 # && make install
 
 # install tensorflow
-RUN pip3 install tensorflow
-RUN pip3 install Pillow
+ADD ./tensorflow-1.1.0-cp35-cp35m-linux_armv7l.whl .
+RUN pip3 install ./tensorflow-1.1.0-cp35-cp35m-linux_armv7l.whl
+#RUN pip3 install tensorflow
+#RUN pip3 install Pillow
 
+RUN pip3 install keras==2.1.2
+
+#RUN apt-get install libpq-dev \
+#    libpq-dev \
+#    libtbb2 \
+#    libtbb-dev \
+#    libjpeg-dev \
+#    libpng-dev \
+#    libtiff-dev \
+#    libjasper-dev \
+#    yasm
+#RUN apt-get update && \
+#        apt-get install -y \
+#        build-essential \
+#        cmake \
+#        git \
+#        wget \
+        #unzip \
+        #yasm \
+        #pkg-config \
+        #libswscale-dev \
+        #libtbb2 \
+        #libtbb-dev \
+        #libjpeg-dev \
+        #libpng-dev \
+       # libtiff-dev \
+        #libjasper-dev \
+        #libavformat-dev \
+        #libpq-dev
 # yad2k
 COPY ./src/ /app
 WORKDIR /app/yad2k
+
+# RUN apt-get install xinit
+# RUN apt-get install xserver-xorg
+# RUN apt-get install xserver-xorg-video-fbdev
+#RUN xeyes -display :0.0
 CMD ["python3", "yad2k-realtime.py"]
 
