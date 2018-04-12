@@ -37,33 +37,12 @@ RUN pip3 install ./tensorflow-1.1.0-cp35-cp35m-linux_armv7l.whl
 
 RUN pip3 install keras==2.1.2
 
-#RUN apt-get install libpq-dev \
-#    libpq-dev \
-#    libtbb2 \
-#    libtbb-dev \
-#    libjpeg-dev \
-#    libpng-dev \
-#    libtiff-dev \
-#    libjasper-dev \
-#    yasm
-#RUN apt-get update && \
-#        apt-get install -y \
-#        build-essential \
-#        cmake \
-#        git \
-#        wget \
-        #unzip \
-        #yasm \
-        #pkg-config \
-        #libswscale-dev \
-        #libtbb2 \
-        #libtbb-dev \
-        #libjpeg-dev \
-        #libpng-dev \
-       # libtiff-dev \
-        #libjasper-dev \
-        #libavformat-dev \
-        #libpq-dev
+# RUN apt-get install python-picamera python3-picamera
+
+# RUN apt-get install rpi-update
+# RUN rpi-update
+# RUN modprobe bcm2835-v4l2
+
 # yad2k
 COPY ./src/ /app
 WORKDIR /app/

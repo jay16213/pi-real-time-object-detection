@@ -7,6 +7,8 @@ import random
 import sys
 import time
 
+import cv2 # use opencv 3.4.0
+import picamera
 import numpy as np
 from keras import backend as K
 from keras.models import load_model
@@ -14,13 +16,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from yad2k.models.keras_yolo import yolo_eval, yolo_head
 
-import cv2 # use opencv 3.4.0
 
-from multiprocessing.pool import ThreadPool
-
-model_path = 'model_data/tiny-yolo-voc.h5'
-anchors_path = 'model_data/tiny-yolo-voc_anchors.txt'
-classes_path = 'model_data/pascal_classes.txt'
+MODEL_PATH = 'model_data/yolov2-tiny-voc.h5'
+ANCHORS_PATH = 'model_data/yolov2-tiny-voc_anchors.txt'
+CLASSES_PATH = 'model_data/pascal_classes.txt'
 
 parser = argparse.ArgumentParser(
     description='Run a YOLO_v2 style detection model on test images..')
@@ -47,8 +46,8 @@ def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
     else:
         # Due to skip connection + max pooling in YOLO_v2, inputs must have
         # width and height as multiples of 32.
-        new_image_size = (image.width - (image.width & 0xF),
-                            image.height - (image.height & 0xF))
+        new_image_size = (image.width - (image.width % 32),
+                            image.height - (image.height % 32))
         resized_image = image.resize(new_image_size, Image.BICUBIC)
         image_data = np.array(resized_image, dtype='float32')
         print(image_data.shape)
@@ -63,20 +62,21 @@ def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
             input_image_shape: [image.size[1], image.size[0]],
             K.learning_phase(): 0
         })
-    # print('Found {} boxes for {}'.format(len(out_boxes), image_file))
-
-    font = ImageFont.truetype(
-        font='font/FiraMono-Medium.otf',
-        size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-    thickness = (image.size[0] + image.size[1]) // 300
 
     for i, c in reversed(list(enumerate(out_classes))):
         predicted_class = class_names[c]
         box = out_boxes[i]
         score = out_scores[i]
 
+        # print detection result
+        print(predicted_class, score)
+
         label = '{} {:.2f}'.format(predicted_class, score)
-        # print(predicted_class, score)
+
+        font = ImageFont.truetype(
+                font='font/FiraMono-Medium.otf',
+                size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+        thickness = (image.size[0] + image.size[1]) // 300
 
         draw = ImageDraw.Draw(image)
         label_size = draw.textsize(label, font)
@@ -111,29 +111,31 @@ def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
 def _main(args):
     sess = K.get_session()
 
+    print("loading class file")
     global class_names
-    with open(classes_path) as f:
+    with open(CLASSES_PATH) as f:
         class_names = f.readlines()
     class_names = [c.strip() for c in class_names]
 
-    with open(anchors_path) as f:
+    print("loading anchors")
+    with open(ANCHORS_PATH) as f:
         anchors = f.readline()
         anchors = [float(x) for x in anchors.split(',')]
         anchors = np.array(anchors).reshape(-1, 2)
 
+    print("loading yolo model")
     global yolo_model
-    yolo_model = load_model(model_path)
+    yolo_model = load_model(MODEL_PATH)
+
 
     # Verify model, anchors, and classes are compatible
     num_classes = len(class_names)
-    num_anchors = len(anchors)
     # TODO: Assumes dim ordering is channel last
     model_output_channels = yolo_model.layers[-1].output_shape[-1]
-    assert model_output_channels == num_anchors * (num_classes + 5), \
+    assert model_output_channels == len(anchors) * (num_classes + 5), \
         'Mismatch between model and given anchor and class sizes. ' \
-        'Specify matching anchors and classes with --anchors_path and ' \
-        '--classes_path flags.'
-    print('{} model, anchors, and classes loaded.'.format(model_path))
+        'Exit.'
+    print('{} model, anchors, and classes loaded.'.format(MODEL_PATH))
 
     # Check if model is fully convolutional, assuming channel last order.
     global model_image_size
@@ -142,8 +144,8 @@ def _main(args):
     is_fixed_size = model_image_size != (None, None)
 
     # Generate colors for drawing bounding boxes.
-    hsv_tuples = [(x / len(class_names), 1., 1.)
-                  for x in range(len(class_names))]
+    hsv_tuples = [(x / num_classes, 1., 1.)
+                  for x in range(num_classes)]
     global colors
     colors = list(map(lambda x: colorsys.hsv_to_rgb(*x), hsv_tuples))
     colors = list(
@@ -155,7 +157,7 @@ def _main(args):
 
     # Generate output tensor targets for filtered bounding boxes.
     # TODO: Wrap these backend operations with Keras layers.
-    yolo_outputs = yolo_head(yolo_model.output, anchors, len(class_names))
+    yolo_outputs = yolo_head(yolo_model.output, anchors, num_classes)
     global input_image_shape
     input_image_shape = K.placeholder(shape=(2, ))
     boxes, scores, classes = yolo_eval(
@@ -167,32 +169,36 @@ def _main(args):
 
 #########################################################################3
     print("capture pi camera...")
+
+    # set camera resolution
+    with picamera.PiCamera() as camera:
+        camera.resolution = (320, 320)
+
+    # use opencv to capture frames
     cam = cv2.VideoCapture(0)
+    cam.set(cv2.CAP_PROP_FRAME_WIDTH, 320)
+    cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 320)
+    cam.set(cv2.CAP_PROP_FPS, 30)
+
     rval, frame = cam.read()
     if rval == False:
-        print("Error: Can not find the camera. Exit")
+        print("Error: Camera is not Found. Exit")
         sys.exit(1)
-
-    #pool = ThreadPool(processes=1)
 
     while True:
         before = time.time()
-        #result = pool.apply_async(detect_image, (frame, sess, boxes, scores, classes, is_fixed_size,))
-
         detect_img = detect_image(frame, sess, boxes, scores, classes, is_fixed_size)
-        cv_image = np.array(detect_img)
-
-        cv2.imshow("preview", cv_image)
         after = time.time()
 
+        cv2.imshow("preview", np.array(detect_img))
+
         if cv2.waitKey(1) & 0xFF == ord('q'):
-            sess.close()
             break
 
-        print("FPS: {}".format(2 / (after-before)))
+        print("FPS: {}".format(1 / (after-before)))
         rval, frame = cam.read()
 
-    # pool.close()
+    sess.close()
     cam.release()
     cv2.destroyAllWindows()
 
