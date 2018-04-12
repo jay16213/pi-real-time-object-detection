@@ -4,6 +4,8 @@ import colorsys
 import imghdr
 import os
 import random
+import sys
+import time
 
 import numpy as np
 from keras import backend as K
@@ -13,6 +15,8 @@ from PIL import Image, ImageDraw, ImageFont
 from yad2k.models.keras_yolo import yolo_eval, yolo_head
 
 import cv2 # use opencv 3.4.0
+
+from multiprocessing.pool import ThreadPool
 
 model_path = 'model_data/tiny-yolo-voc.h5'
 anchors_path = 'model_data/tiny-yolo-voc_anchors.txt'
@@ -34,8 +38,7 @@ parser.add_argument(
     default=.5)
 
 def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
-    cv2_im = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = Image.fromarray(cv2_im)
+    image = Image.fromarray(image)
 
     if is_fixed_size:  # TODO: When resizing we can use minibatch input.
         resized_image = image.resize(
@@ -44,8 +47,8 @@ def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
     else:
         # Due to skip connection + max pooling in YOLO_v2, inputs must have
         # width and height as multiples of 32.
-        new_image_size = (image.width - (image.width % 32),
-                            image.height - (image.height % 32))
+        new_image_size = (image.width - (image.width & 0xF),
+                            image.height - (image.height & 0xF))
         resized_image = image.resize(new_image_size, Image.BICUBIC)
         image_data = np.array(resized_image, dtype='float32')
         print(image_data.shape)
@@ -73,7 +76,7 @@ def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
         score = out_scores[i]
 
         label = '{} {:.2f}'.format(predicted_class, score)
-        print(predicted_class, score)
+        # print(predicted_class, score)
 
         draw = ImageDraw.Draw(image)
         label_size = draw.textsize(label, font)
@@ -170,22 +173,29 @@ def _main(args):
         print("Error: Can not find the camera. Exit")
         sys.exit(1)
 
-    while True:
-        if frame is not None:
-            detect_img = detect_image(frame, sess, boxes, scores, classes, is_fixed_size)
-            cv_image = np.array(detect_img)
-            cv2.imshow("preview", cv_image)
-        rval, frame = cam.read()
+    #pool = ThreadPool(processes=1)
 
-        i = cv2.waitKey(1)
-        if i & 0xFF == ord('q'):
+    while True:
+        before = time.time()
+        #result = pool.apply_async(detect_image, (frame, sess, boxes, scores, classes, is_fixed_size,))
+
+        detect_img = detect_image(frame, sess, boxes, scores, classes, is_fixed_size)
+        cv_image = np.array(detect_img)
+
+        cv2.imshow("preview", cv_image)
+        after = time.time()
+
+        if cv2.waitKey(1) & 0xFF == ord('q'):
             sess.close()
             break
 
+        print("FPS: {}".format(2 / (after-before)))
+        rval, frame = cam.read()
+
+    # pool.close()
     cam.release()
     cv2.destroyAllWindows()
 
 
 if __name__=='__main__':
     _main(parser.parse_args())
-

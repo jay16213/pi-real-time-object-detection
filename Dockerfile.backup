@@ -48,7 +48,7 @@ RUN pip3 install Pillow
 
 # yad2k
 COPY ./src/ /app
-WORKDIR /app/yad2k
+WORKDIR /app/
 #RUN ./yad2k.py model_data/yolov1-tiny.cfg model_data/yolo-tiny.weights model_data/yolo-tiny.h5
 
 

@@ -66,11 +66,11 @@ RUN pip3 install keras==2.1.2
         #libpq-dev
 # yad2k
 COPY ./src/ /app
-WORKDIR /app/yad2k
+WORKDIR /app/
 
 # RUN apt-get install xinit
 # RUN apt-get install xserver-xorg
 # RUN apt-get install xserver-xorg-video-fbdev
 #RUN xeyes -display :0.0
-CMD ["python3", "yad2k-realtime.py"]
+CMD ["python3", "pi-realtime.py"]
 
