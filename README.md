@@ -1,13 +1,21 @@
 # Raspberry Pi Real Time Object Detection
 
-## RUN
+## Run with Docker
 
-```
-xhost +
+Install docker if you have not install on pi yet
+```bash
+curl -fsSL https://get.docker.com/ | sh
 ```
 
+If you would like to use Docker as a non-root user, add your user to the "docker" group
+```bash
+sudo usermod -aG docker <user>
 ```
-docker run -it --rm -e DISPLAY=$DISPLAY \
-       -v /tmp/.X11-unix:/tmp/.X11-unix \
+
+After usermod you should logout to save the change
+
+
+```bash
+docker run -it --rm --privileged -v ./src/:/app \
        --device /dev/video0 raspi-realtime
 ```

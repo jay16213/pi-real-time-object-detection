@@ -17,8 +17,8 @@ from PIL import Image, ImageDraw, ImageFont
 from yad2k.models.keras_yolo import yolo_eval, yolo_head
 
 
-MODEL_PATH = 'model_data/yolov2-tiny-voc.h5'
-ANCHORS_PATH = 'model_data/yolov2-tiny-voc_anchors.txt'
+MODEL_PATH = 'model_data/tiny-yolo-voc.h5'
+ANCHORS_PATH = 'model_data/tiny-yolo-voc_anchors.txt'
 CLASSES_PATH = 'model_data/pascal_classes.txt'
 
 parser = argparse.ArgumentParser(
@@ -36,21 +36,12 @@ parser.add_argument(
     help='threshold for non max suppression IOU, default .5',
     default=.5)
 
-def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
+def detect_image(image, sess, boxes, scores, classes):
     image = Image.fromarray(image)
 
-    if is_fixed_size:  # TODO: When resizing we can use minibatch input.
-        resized_image = image.resize(
-            tuple(reversed(model_image_size)), Image.BICUBIC)
-        image_data = np.array(resized_image, dtype='float32')
-    else:
-        # Due to skip connection + max pooling in YOLO_v2, inputs must have
-        # width and height as multiples of 32.
-        new_image_size = (image.width - (image.width % 32),
-                            image.height - (image.height % 32))
-        resized_image = image.resize(new_image_size, Image.BICUBIC)
-        image_data = np.array(resized_image, dtype='float32')
-        print(image_data.shape)
+    resized_image = image.resize(
+        tuple(reversed(model_image_size)), Image.BICUBIC)
+    image_data = np.array(resized_image, dtype='float32')
 
     image_data /= 255.
     image_data = np.expand_dims(image_data, 0)  # Add batch dimension.
@@ -63,6 +54,11 @@ def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
             K.learning_phase(): 0
         })
 
+    font = ImageFont.truetype(
+            font='font/FiraMono-Medium.otf',
+            size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
+    thickness = (image.size[0] + image.size[1]) // 300
+
     for i, c in reversed(list(enumerate(out_classes))):
         predicted_class = class_names[c]
         box = out_boxes[i]
@@ -72,11 +68,6 @@ def detect_image(image, sess, boxes, scores, classes, is_fixed_size):
         print(predicted_class, score)
 
         label = '{} {:.2f}'.format(predicted_class, score)
-
-        font = ImageFont.truetype(
-                font='font/FiraMono-Medium.otf',
-                size=np.floor(3e-2 * image.size[1] + 0.5).astype('int32'))
-        thickness = (image.size[0] + image.size[1]) // 300
 
         draw = ImageDraw.Draw(image)
         label_size = draw.textsize(label, font)
@@ -140,8 +131,6 @@ def _main(args):
     # Check if model is fully convolutional, assuming channel last order.
     global model_image_size
     model_image_size = yolo_model.layers[0].input_shape[1:3]
-    global is_fixed_size
-    is_fixed_size = model_image_size != (None, None)
 
     # Generate colors for drawing bounding boxes.
     hsv_tuples = [(x / num_classes, 1., 1.)
@@ -167,7 +156,7 @@ def _main(args):
         iou_threshold=args.iou_threshold)
 
 
-#########################################################################3
+    #########################################################################
     print("capture pi camera...")
 
     # set camera resolution
@@ -184,10 +173,12 @@ def _main(args):
     if rval == False:
         print("Error: Camera is not Found. Exit")
         sys.exit(1)
+    cv2.imshow("preview", np.array(frame))
 
     while True:
+        rval, frame = cam.read()
         before = time.time()
-        detect_img = detect_image(frame, sess, boxes, scores, classes, is_fixed_size)
+        detect_img = detect_image(frame, sess, boxes, scores, classes)
         after = time.time()
 
         cv2.imshow("preview", np.array(detect_img))
@@ -196,7 +187,6 @@ def _main(args):
             break
 
         print("FPS: {}".format(1 / (after-before)))
-        rval, frame = cam.read()
 
     sess.close()
     cam.release()
