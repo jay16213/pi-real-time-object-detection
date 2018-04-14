@@ -17,8 +17,8 @@ from PIL import Image, ImageDraw, ImageFont
 from yad2k.models.keras_yolo import yolo_eval, yolo_head
 
 
-MODEL_PATH = 'model_data/tiny-yolo-voc.h5'
-ANCHORS_PATH = 'model_data/tiny-yolo-voc_anchors.txt'
+MODEL_PATH = 'model_data/yolov2-tiny-voc.h5'
+ANCHORS_PATH = 'model_data/yolov2-tiny-voc_anchors.txt'
 CLASSES_PATH = 'model_data/pascal_classes.txt'
 
 parser = argparse.ArgumentParser(
