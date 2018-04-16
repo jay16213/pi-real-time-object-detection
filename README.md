@@ -15,7 +15,7 @@ sudo usermod -aG docker <user>
 After usermod you should logout to save the change
 
 
+### Run
 ```bash
-docker run -it --rm --privileged -v ./src/:/app \
-       --device /dev/video0 raspi-realtime
+./run_docker.sh
 ```

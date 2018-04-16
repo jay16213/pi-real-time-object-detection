@@ -11,5 +11,5 @@ sudo modprobe bcm2835-v4l2
 # run docker
 docker run -it --rm --privileged \
     -v /tmp/.X11-unix:/tmp/.X11-unix -e DISPLAY=$DISPLAY \
-    raspi-realtime
+    jay16213/raspi-yad2k
 
